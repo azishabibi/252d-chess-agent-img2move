@@ -1,0 +1,20 @@
+# dataset.yaml
+path: ../dataset            # ← root of train/, val/, labels/
+train: images/train                # ← folder under `${path}` containing all .jpg/.jpeg
+val:   images/val                  # ← exactly 10 000 images you moved into `dataset/val/`
+test: images/test
+# classes
+nc: 12
+names:
+  0: white_pawn
+  1: white_knight
+  2: white_bishop
+  3: white_rook
+  4: white_queen
+  5: white_king
+  6: black_pawn
+  7: black_knight
+  8: black_bishop
+  9: black_rook
+  10: black_queen
+  11: black_king

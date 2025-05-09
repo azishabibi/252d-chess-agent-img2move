@@ -1,0 +1,19 @@
+Validating runs/chess/yolov5-chess5/weights/best.pt...
+Ultralytics 8.3.129 🚀 Python-3.12.9 torch-2.7.0+cu126 CUDA:7 (NVIDIA A100 80GB PCIe, 81051MiB)
+YOLOv5s6u summary (fused): 111 layers, 15,258,592 parameters, 0 gradients, 24.3 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 
+                   all      10000     100130          1          1      0.995      0.982
+            white_pawn       5870       9098          1          1      0.995      0.975
+          white_knight       5830       8784          1          1      0.995      0.975
+          white_bishop       5858       8990          1          1      0.995      0.983
+            white_rook       5777       8897          1          1      0.995      0.972
+           white_queen       3578       4399          1          1      0.995      0.974
+            white_king      10000      10000          1          1      0.995      0.984
+            black_pawn       5916       8980          1          1      0.995      0.984
+          black_knight       5813       8873          1          1      0.995       0.99
+          black_bishop       5842       8757          1          1      0.995       0.99
+            black_rook       5843       8905          1          1      0.995      0.989
+           black_queen       3589       4447          1          1      0.995      0.987
+            black_king      10000      10000          1          1      0.995      0.987
+Speed: 0.1ms preprocess, 2.0ms inference, 0.0ms loss, 2.1ms postprocess per image
+Results saved to runs/chess/yolov5-chess5
