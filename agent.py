@@ -112,8 +112,8 @@ class ChessPlayAgent:
     def apply_move(self, uci: str):
         self.board.push(chess.Move.from_uci(uci))
 
-    def render_board_image(self, out_path: str, size: int = 400):
-        svg = chess.svg.board(self.board, size=size)
+    def render_board_image(self, out_path: str, size: int = 400, orientation: bool = True):
+        svg = chess.svg.board(self.board, size=size, orientation=orientation)
         cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=out_path)
 
     def parse_user_move_with_llm(self, user_input: str, max_retries: int = 3) -> str:
@@ -197,13 +197,13 @@ class ChessPlayAgent:
         # 3) default‐start if no board
         if self.board is None:
             self.board = chess.Board()
-
+        orientation = chess.WHITE if user_side == "white" else chess.BLACK
         # 4) if it's engine's turn, skip waiting for user_input
         if side_to_move != user_side:
             # engine moves
             choice = self.decide_next_move(image_bytes=None)
             self.apply_move(choice["uci"])
-            self.render_board_image(output_png)
+            self.render_board_image(output_png,orientation=orientation)
             return {
                 "mode":       "engine_move",
                 "agent_move": choice["san"],
@@ -225,7 +225,7 @@ class ChessPlayAgent:
         self.board.push(move)
         choice = self.decide_next_move(image_bytes=None)
         self.apply_move(choice["uci"])
-        self.render_board_image(output_png)
+        self.render_board_image(output_png,orientation=orientation)
         return {
             "mode":       "move",
             "user_move":  uci,

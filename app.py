@@ -44,13 +44,14 @@ def gradio_play(image, move_text, side_to_move, user_side, restart_flag):
         if out["mode"] == "engine_move":
             # engine is moving first (side_to_move != user_side)
             engine_side = side_to_move  # "white" or "black"
-            msg = f"{engine_side} plays: {out['agent_move']}"
+            msg = f"{engine_side.title()} plays: {out['agent_move']}."
         elif out["mode"] == "move":
             # user just moved, now engine (the opposite side) plays
             engine_side = "white" if user_side == "black" else "black"
-            msg = f"You played {out['user_move']}. {engine_side} plays: {out['agent_move']}."
+            msg = f"You played {out['user_move']}. {engine_side.title()} plays: {out['agent_move']}."
         else:
             msg = out.get("description", "")
+            
         return out.get("png"), msg, gr.update(value=False)
 
     except Exception as e:
