@@ -6,7 +6,7 @@ from fastapi import FastAPI
 import gradio as gr
 from gradio.routes import mount_gradio_app
 from dotenv import load_dotenv
-
+from PIL import Image
 from agent import ChessPlayAgent
 
 load_dotenv()
@@ -26,13 +26,38 @@ def gradio_play(image, move_text, side_to_move, user_side, restart_flag):
         agent.reset()
         return None, "Game restarted – upload a board or enter a move.", gr.update(value=False)
 
-    # 2) Initialize from image *only if* no move_text provided
-    if image is not None and (not move_text or move_text.strip() == ""):
-        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        image.save(tmp.name)
-        out  = agent.handle_input(tmp.name, side_to_move, user_side, output_png="out.png")
-        return None, f"Board initialized. {out.get('description','')}", gr.update(value=False)
+    # 2) Initialize from image 
+    if image is not None and agent.board is None:
+        # — save the uploaded image to disk
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            image.save(tmp.name)
+            tmp_path = tmp.name
 
+        # — first, initialize the board from the image
+        init_out = agent.handle_input(tmp_path, side_to_move, user_side, output_png="out.png")
+
+        # — if the user also typed a move, play it now
+        if move_text:
+            move_out = agent.handle_input(
+                user_input=move_text,
+                side_to_move=side_to_move,
+                user_side=user_side,
+                output_png="out.png"
+            )
+            # build feedback
+            if move_out["mode"] == "move":
+                engine_side = "white" if user_side == "black" else "black"
+                msg = f"You played {move_out['user_move']}. {engine_side.title()} plays: {move_out['agent_move']}."
+            elif move_out["mode"] == "engine_move":
+                msg = f"{side_to_move.title()} plays: {move_out['agent_move']}."
+            else:
+                msg = move_out.get("description", "")
+            board_img = Image.open(move_out["png"])
+            return board_img, msg, gr.update(value=False)
+
+        # — if no move was provided, just return the initialized board
+        board_img = Image.open(init_out["png"])
+        return board_img, f"Board initialized. {init_out.get('description','')}", gr.update(value=False)
     # 3) Otherwise, handle a move (either user or engine depending on turn)
     try:
         out = agent.handle_input(

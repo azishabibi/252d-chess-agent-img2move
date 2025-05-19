@@ -10,6 +10,7 @@ import chess.svg
 import cairosvg
 from openai import OpenAI, OpenAIError
 
+img_size = (448, 448)
 class ChessPlayAgent:
     # PIECE_REGEX = re.compile(
     #     r"\b(move\s+the\s+)?(?P<piece>pawn|knight|bishop|rook|queen|king)"
@@ -34,7 +35,7 @@ class ChessPlayAgent:
     def infer_fen_from_image(self, image_path: Path, conf_thresh: float = 0.9) -> str:
         res = self.model.predict(
             source=str(image_path),
-            imgsz=(448, 448),
+            imgsz=img_size,
             device=self.device,
             conf=conf_thresh
         )[0]
@@ -188,18 +189,23 @@ class ChessPlayAgent:
             img_bytes = image_path.read_bytes()
             fen = self.infer_fen_from_image(image_path)
             self.board = chess.Board(fen)
+            self.render_board_image(out_path=output_png, size=img_size[0])
             return {
                 "mode":        "image_init",
                 "fen":         fen,
-                "description": self.describe_board()
+                "description": self.describe_board(),
+                "png":         output_png
             }
 
         # 3) default‐start if no board
         if self.board is None:
             self.board = chess.Board()
+            if side_to_move == "black":            # honour the radio **once**
+                self.board.turn = chess.BLACK
         orientation = chess.WHITE if user_side == "white" else chess.BLACK
+        current_turn = "white" if self.board.turn == chess.WHITE else "black"
         # 4) if it's engine's turn, skip waiting for user_input
-        if side_to_move != user_side:
+        if current_turn != user_side:
             # engine moves
             choice = self.decide_next_move(image_bytes=None)
             self.apply_move(choice["uci"])
