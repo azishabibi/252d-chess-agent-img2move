@@ -11,6 +11,7 @@ import cairosvg
 from openai import OpenAI, OpenAIError
 
 img_size = (448, 448)
+model_name = "gpt-4o"
 class ChessPlayAgent:
     # PIECE_REGEX = re.compile(
     #     r"\b(move\s+the\s+)?(?P<piece>pawn|knight|bishop|rook|queen|king)"
@@ -89,7 +90,7 @@ class ChessPlayAgent:
         for attempt in range(max_retries):
             try:
                 resp = self.openai.chat.completions.create(
-                    model="gpt-4o",
+                    model=model_name,
                     messages=messages,
                     temperature=0.0
                 )
@@ -142,7 +143,7 @@ class ChessPlayAgent:
 
         for _ in range(max_retries):
             resp = self.openai.chat.completions.create(
-                model="gpt-4o",
+                model=model_name,
                 messages=messages,
                 temperature=0.0
             )
