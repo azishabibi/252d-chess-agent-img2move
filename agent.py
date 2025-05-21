@@ -11,7 +11,7 @@ import cairosvg
 from openai import OpenAI, OpenAIError
 
 img_size = (448, 448)
-model_name = "gpt-4o"
+model_name = "gpt-4.1"
 class ChessPlayAgent:
     # PIECE_REGEX = re.compile(
     #     r"\b(move\s+the\s+)?(?P<piece>pawn|knight|bishop|rook|queen|king)"
@@ -69,18 +69,44 @@ class ChessPlayAgent:
             descs.append(f"{color} {name} on {chess.square_name(sq)}")
         return "; ".join(descs) or "Empty board"
 
+    def describe_legal_moves(self) -> str:
+        descs = []
+        for move in self.board.legal_moves:
+            piece = self.board.piece_at(move.from_square)
+            color = "White" if piece.color else "Black"
+            name  = chess.piece_name(piece.piece_type)
+            frm   = chess.square_name(move.from_square)
+            to    = chess.square_name(move.to_square)
+            descs.append(f"{color} {name} from {frm} to {to}")
+        return "; ".join(descs) or "No legal moves"
+
     def decide_next_move(self, image_bytes: bytes = None, max_retries: int = 3) -> dict:
         fen  = self.board.fen()
         desc = self.describe_board()
+        # 1) Compute the UCI list:
+        legal_moves = [m.uci() for m in self.board.legal_moves]
+        legal_moves = ", ".join(legal_moves)
+        legal_desc  = self.describe_legal_moves()
+        print(f"Legal moves: {legal_desc}")
         system = (
-            "You are a top‑tier chess engine. "
-            "Given the board state, choose the best next move. "
-            "Reply ONLY as JSON: {\"uci\": \"e2e4\", \"san\": \"e4\"}."
-        )
+             "You are a world-class chess engine and grandmaster.\n"
+             "When given a board state in FEN and a description of all piece locations and all possible moves in oth uci format and natual language format,\n"
+             "follow this process internally:\n"
+             "  1. Based on the description of all piece locations and FEN, evaluate the current position based on the side you are playing.\n"
+             "  2. Evaluate each candidate move(from all possible moves given by you) using core chess principles (step-by-step)\n"
+             "     (material balance, king safety, center control, piece activity, tactics, etc).\n"
+             "  3. Select the single strongest move.\n"
+             "Finally, output ONLY valid JSON with exactly two keys:\n"
+             "  {\"uci\": \"<best-move-in-uci>\", \"san\": \"<best-move-in-san>\"}\n"
+             "Do not include any other text or commentary."
+         )
         messages = [
-            {"role":"system", "content": system},
-            {"role":"user",   "content": f"FEN: {fen}\nDesc: {desc}"}
+            {"role": "system", "content": system},
+            {"role": "user",   "content": f"FEN: {fen}\nPiece locations: {desc}"},
+            {"role": "user",   "content": f"Legal moves (UCI): {legal_moves}"},
+            {"role": "user",   "content": f"Move descriptions: {legal_desc}"}
         ]
+
         if image_bytes:
             messages.append({
                 "role": "user",
@@ -140,6 +166,26 @@ class ChessPlayAgent:
             {"role": "system", "content": prompt_sys},
             {"role": "user",   "content": prompt_usr}
         ]
+        # 0) Normalize any lowercase‐piece SAN (e.g., "nf3"→"Nf3", "ra8"→"Ra8", "qd6"→"Qd6")
+        san = user_input.strip()
+        if re.fullmatch(r"[nbrqk][a-h][1-8]", san, flags=re.IGNORECASE):
+            # only uppercase the first char if it's a piece letter
+            if san[0].islower():
+                san = san[0].upper() + san[1:]
+        # 1) Try local SAN parsing (e.g., "Nf3")
+        try:
+            move = self.board.parse_san(san)
+            return move.uci()
+        except ValueError:
+            pass
+        # 2) Try direct UCI parsing (e.g., "g1f3")
+        try:
+            move = chess.Move.from_uci(user_input)
+            if move in self.board.legal_moves:
+                return user_input
+        except ValueError:
+            pass
+         # 3) Fallback to LLM-based parsing
 
         for _ in range(max_retries):
             resp = self.openai.chat.completions.create(
@@ -211,6 +257,22 @@ class ChessPlayAgent:
             choice = self.decide_next_move(image_bytes=None)
             self.apply_move(choice["uci"])
             self.render_board_image(output_png,orientation=orientation)
+            # ↳ check for game over right after engine move
+            if self.board.is_checkmate():
+                winner = "White" if self.board.turn == chess.BLACK else "Black"
+                return {
+                    "mode":      "game_over",
+                    "result":    f"Checkmate! {winner} wins.",
+                    "final_fen": self.board.fen(),
+                    "png":       output_png
+                }
+            if self.board.is_stalemate():
+                return {
+                    "mode":      "game_over",
+                    "result":    "Stalemate. Draw.",
+                    "final_fen": self.board.fen(),
+                    "png":       output_png
+                }
             return {
                 "mode":       "engine_move",
                 "agent_move": choice["san"],
@@ -219,26 +281,55 @@ class ChessPlayAgent:
             }
 
         # 5) it's the user's turn: parse & validate their move
+        # Attempt SAN/UCI parsing
         uci = self.parse_user_move_with_llm(user_input)
         move = chess.Move.from_uci(uci)
         if move not in self.board.legal_moves:
-            # reject illegal moves outright
+            # Illegal move: render board and report
+            self.render_board_image(output_png, orientation=orientation)
             return {
                 "mode":        "illegal_move",
-                "description": f"Illegal move: {user_input!r}"
+                "description": f"Illegal move: {user_input!r}",
+                "png":         output_png
             }
 
         # OK—apply user move and then engine reply
+        # apply user's move and then engine reply
         self.board.push(move)
-        choice = self.decide_next_move(image_bytes=None)
-        self.apply_move(choice["uci"])
-        self.render_board_image(output_png,orientation=orientation)
-        return {
-            "mode":       "move",
-            "user_move":  uci,
-            "agent_move": choice["san"],
-            "new_fen":    self.board.fen(),
-            "png":        output_png
-        }
+        # ↳ check for game over right after engine move
+        if self.board.is_checkmate():
+            winner = "White" if self.board.turn == chess.BLACK else "Black"
+            return {
+                "mode":      "game_over",
+                "result":    f"Checkmate! {winner} wins.",
+                "final_fen": self.board.fen(),
+                "png":       output_png
+            }
+        if self.board.is_stalemate():
+            return {
+                "mode":      "game_over",
+                "result":    "Stalemate. Draw.",
+                "final_fen": self.board.fen(),
+                "png":       output_png
+            }
+        try:
+            choice = self.decide_next_move()
+            self.apply_move(choice["uci"])
+            self.render_board_image(output_png, orientation=orientation)
+            return {
+                "mode":       "move",
+                "user_move":  uci,
+                "agent_move": choice["san"],
+                "new_fen":    self.board.fen(),
+                "png":        output_png
+            }
+        except RuntimeError:
+            self.render_board_image(output_png, orientation=orientation)
+            return {
+                "mode":        "engine_failed",
+                "description": "Failed to get a legal engine move after user move",
+                "png":         output_png
+            }
+
 
 
