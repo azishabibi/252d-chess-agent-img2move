@@ -236,6 +236,8 @@ class ChessPlayAgent:
             img_bytes = image_path.read_bytes()
             fen = self.infer_fen_from_image(image_path)
             self.board = chess.Board(fen)
+            self.board.turn = chess.WHITE if side_to_move.lower() == "white" else chess.BLACK
+            fen = self.board.fen()
             self.render_board_image(out_path=output_png, size=img_size[0])
             return {
                 "mode":        "image_init",
@@ -282,7 +284,15 @@ class ChessPlayAgent:
 
         # 5) it's the user's turn: parse & validate their move
         # Attempt SAN/UCI parsing
-        uci = self.parse_user_move_with_llm(user_input)
+        try:
+            uci = self.parse_user_move_with_llm(user_input)
+        except ValueError as err:                 # couldn’t parse the text
+            self.render_board_image(output_png, orientation=orientation)
+            return {
+                "mode":        "parse_error",     # any name is fine; app.py falls back to description
+                "description": str(err),          # e.g. 'Unable to parse a legal move from: Qf3'
+                "png":         output_png
+            }
         move = chess.Move.from_uci(uci)
         if move not in self.board.legal_moves:
             # Illegal move: render board and report
@@ -298,17 +308,19 @@ class ChessPlayAgent:
         self.board.push(move)
         # ↳ check for game over right after engine move
         if self.board.is_checkmate():
+            self.render_board_image(output_png, orientation=orientation)
             winner = "White" if self.board.turn == chess.BLACK else "Black"
             return {
                 "mode":      "game_over",
-                "result":    f"Checkmate! {winner} wins.",
+                "description":    f"Checkmate! {winner} wins.",
                 "final_fen": self.board.fen(),
                 "png":       output_png
             }
         if self.board.is_stalemate():
+            self.render_board_image(output_png, orientation=orientation)
             return {
                 "mode":      "game_over",
-                "result":    "Stalemate. Draw.",
+                "description":    "Stalemate. Draw.",
                 "final_fen": self.board.fen(),
                 "png":       output_png
             }
