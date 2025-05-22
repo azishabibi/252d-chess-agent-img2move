@@ -84,22 +84,23 @@ def gradio_play(image, move_text, side_to_move, user_side, white_bottom, restart
     except Exception as e:
         return None, f"Error: {e}", gr.update(value=False)
 
+PREVIEW_SIZE = 400
 
 with gr.Blocks() as demo:
     gr.Markdown("## Chess Agent Playground")
 
     with gr.Row():
         with gr.Column():
-            board_in   = gr.Image(type="pil", label="Board Image")
+            board_in   = gr.Image(type="pil", label="Board Image",height=PREVIEW_SIZE)
             move_in    = gr.Textbox(label="Move", placeholder="e4 or move knight from g1 to f3")
             side_to    = gr.Radio(["white","black"], value="white", label="Side to move")
             user_side  = gr.Radio(["white","black"], value="white", label="Your side")
-            white_bot  = gr.Checkbox(label="White side at bottom",value=True)  # ← NEW
+            white_bot  = gr.Checkbox(label="White side at bottom",value=True)
             restart    = gr.Checkbox(label="Restart game")
             play_btn   = gr.Button("Submit")
 
         with gr.Column():
-            board_out  = gr.Image(label="Updated Board")
+            board_out  = gr.Image(label="Updated Board",height=PREVIEW_SIZE)
             feedback   = gr.Textbox(label="Status", interactive=False)
 
     play_btn.click(
