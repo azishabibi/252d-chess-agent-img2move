@@ -112,6 +112,10 @@ def refresh_chess960(side_to_move, user_side, white_bottom):
     msg       = f"Chess960 board refreshed. {init_out.get('description','')}"
     return board_img, msg, gr.update(value=False)
 
+def gradio_restart():
+    agent.reset()
+    return None, "Game restarted – upload a board or enter a move."
+
 PREVIEW_SIZE = 400
 
 with gr.Blocks() as demo:
@@ -120,14 +124,20 @@ with gr.Blocks() as demo:
     with gr.Row():
         with gr.Column():
             board_in   = gr.Image(type="pil", label="Board Image",height=PREVIEW_SIZE)
-            move_in    = gr.Textbox(label="Move", placeholder="e4 or move knight from g1 to f3")
-            side_to    = gr.Radio(["white","black"], value="white", label="Side to move")
-            user_side  = gr.Radio(["white","black"], value="white", label="Your side")
-            white_bot  = gr.Checkbox(label="White side at bottom",value=True)
-            game_mode = gr.Radio(["Standard","Chess960"], value="Standard", label="Game Mode, normal or chess960")
-            restart    = gr.Checkbox(label="Restart game")
-            play_btn   = gr.Button("Submit")
-            refresh_btn = gr.Button("Refresh Board")
+            with gr.Row():
+                move_in    = gr.Textbox(label="Move", placeholder="e4 or move knight from g1 to f3")
+                with gr.Column():
+                    play_btn   = gr.Button("Submit")
+                    restart_btn = gr.Button("Restart Game")
+                    
+            with gr.Row():
+                side_to    = gr.Radio(["white","black"], value="white", label="Side to move")
+                user_side  = gr.Radio(["white","black"], value="white", label="Your side")
+            with gr.Row():
+                game_mode = gr.Radio(["Standard","Chess960"], value="Standard", label="Game Mode")
+                with gr.Column():
+                    white_bot  = gr.Checkbox(label="White side at bottom",value=True)
+                    refresh_btn = gr.Button("Refresh Board(chess960)")           
 
         with gr.Column():
             board_out  = gr.Image(label="Updated Board",height=PREVIEW_SIZE)
@@ -135,14 +145,19 @@ with gr.Blocks() as demo:
 
     play_btn.click(
         fn=gradio_play,
-        inputs=[board_in, move_in, side_to, user_side, white_bot, game_mode, restart],
-        outputs=[board_out, feedback, restart],
+        inputs=[board_in, move_in, side_to, user_side, white_bot, game_mode],
+        outputs=[board_out, feedback],
+    )
+    restart_btn.click(
+        fn=gradio_restart,
+        inputs=[],
+        outputs=[board_out, feedback]
     )
 
     refresh_btn.click(
         fn=refresh_chess960,
         inputs=[side_to, user_side, white_bot],
-        outputs=[board_out, feedback, restart]
+        outputs=[board_out, feedback]
     )
 
 
