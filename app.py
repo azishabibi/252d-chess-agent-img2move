@@ -24,7 +24,7 @@ def gradio_play(image, move_text, side_to_move, user_side, white_bottom, game_mo
     # 1) Restart
     if restart_flag:
         agent.reset()
-        return None, "Game restarted – upload a board or enter a move.", gr.update(value=False)
+        return None, "Game restarted - upload a board or enter a move.", gr.update(value=False)
 
     # chess 960 initialization
     chess960 = (game_mode.lower() == "chess960")
@@ -114,7 +114,7 @@ def refresh_chess960(side_to_move, user_side, white_bottom):
 
 def gradio_restart():
     agent.reset()
-    return None, "Game restarted – upload a board or enter a move."
+    return None, "Game restarted - upload a board or enter a move."
 
 PREVIEW_SIZE = 400
 
