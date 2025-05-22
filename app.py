@@ -20,12 +20,26 @@ agent = ChessPlayAgent(
     openai_api_key=OPENAI_API_KEY
 )
 
-def gradio_play(image, move_text, side_to_move, user_side, white_bottom, restart_flag):
+def gradio_play(image, move_text, side_to_move, user_side, white_bottom, game_mode, restart_flag):
     # 1) Restart
     if restart_flag:
         agent.reset()
         return None, "Game restarted – upload a board or enter a move.", gr.update(value=False)
 
+    # chess 960 initialization
+    chess960 = (game_mode.lower() == "chess960")
+    if agent.board is None and chess960:
+            init_out = agent.handle_input(
+                user_input="",
+                side_to_move=side_to_move,
+                user_side=user_side,
+                white_bottom=white_bottom,
+                chess960=True,
+                output_png="out.png"
+            )
+            board_img = Image.open(init_out["png"])
+            msg       = f"Chess960 board initialized. {init_out.get('description','')}"
+            return board_img, msg, gr.update(value=False)
     # 2) Initialize from image 
     if image is not None and agent.board is None:
         # — save the uploaded image to disk
@@ -84,6 +98,20 @@ def gradio_play(image, move_text, side_to_move, user_side, white_bottom, restart
     except Exception as e:
         return None, f"Error: {e}", gr.update(value=False)
 
+def refresh_chess960(side_to_move, user_side, white_bottom):
+    agent.reset()
+    init_out = agent.handle_input(
+        user_input="",
+        side_to_move=side_to_move,
+        user_side=user_side,
+        white_bottom=white_bottom,
+        chess960=True,
+        output_png="out.png"
+    )
+    board_img = Image.open(init_out["png"])
+    msg       = f"Chess960 board refreshed. {init_out.get('description','')}"
+    return board_img, msg, gr.update(value=False)
+
 PREVIEW_SIZE = 400
 
 with gr.Blocks() as demo:
@@ -96,8 +124,10 @@ with gr.Blocks() as demo:
             side_to    = gr.Radio(["white","black"], value="white", label="Side to move")
             user_side  = gr.Radio(["white","black"], value="white", label="Your side")
             white_bot  = gr.Checkbox(label="White side at bottom",value=True)
+            game_mode = gr.Radio(["Standard","Chess960"], value="Standard", label="Game Mode, normal or chess960")
             restart    = gr.Checkbox(label="Restart game")
             play_btn   = gr.Button("Submit")
+            refresh_btn = gr.Button("Refresh Board")
 
         with gr.Column():
             board_out  = gr.Image(label="Updated Board",height=PREVIEW_SIZE)
@@ -105,9 +135,16 @@ with gr.Blocks() as demo:
 
     play_btn.click(
         fn=gradio_play,
-        inputs=[board_in, move_in, side_to, user_side, white_bot, restart],
+        inputs=[board_in, move_in, side_to, user_side, white_bot, game_mode, restart],
         outputs=[board_out, feedback, restart],
     )
+
+    refresh_btn.click(
+        fn=refresh_chess960,
+        inputs=[side_to, user_side, white_bot],
+        outputs=[board_out, feedback, restart]
+    )
+
 
 # Mount Gradio onto FastAPI
 app = mount_gradio_app(app, demo, path="/")

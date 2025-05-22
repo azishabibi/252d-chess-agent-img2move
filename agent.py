@@ -8,6 +8,7 @@ import torch
 import chess
 import chess.svg
 import cairosvg
+import random
 from openai import OpenAI, OpenAIError
 
 img_size = (448, 448)
@@ -217,6 +218,7 @@ class ChessPlayAgent:
         side_to_move: str,
         user_side: str,
         white_bottom: bool = True,
+        chess960: bool = False,
         output_png: str = "next.png",
     ) -> dict:
         """
@@ -232,6 +234,22 @@ class ChessPlayAgent:
         if cmd in ("restart","reset","start over"):
             self.reset()
             return {"status": "restarted"}
+
+        # chess 960 (Fisher Random Chess) mode
+        if chess960 and self.board is None:
+            self.reset()
+            idx = random.randint(0, 959)
+            board = chess.Board.from_chess960_pos(idx)
+            board.turn = chess.WHITE if side_to_move.lower() == "white" else chess.BLACK
+            self.board = board
+            orientation = chess.WHITE if user_side.lower() == "white" else chess.BLACK
+            self.render_board_image(output_png, orientation=orientation)
+            return {
+                "mode": "chess960_init",
+                "fen":     self.board.fen(),
+                "description": self.describe_board(),
+                "png":     output_png
+            }
 
         # 2) image initialization
         if user_input and Path(user_input).is_file():
@@ -251,9 +269,15 @@ class ChessPlayAgent:
 
         # 3) default‐start if no board
         if self.board is None:
-            self.board = chess.Board()
-            if side_to_move == "black":            # honour the radio **once**
-                self.board.turn = chess.BLACK
+            if chess960:
+                idx = random.randint(0, 959)
+                board = chess.Board.from_chess960_pos(idx)
+                board.turn = chess.WHITE if side_to_move.lower() == "white" else chess.BLACK
+                self.board = board
+            else:
+                self.board = chess.Board()
+                if side_to_move.lower() == "black":
+                    self.board.turn = chess.BLACK
         orientation = chess.WHITE if user_side == "white" else chess.BLACK
         current_turn = "white" if self.board.turn == chess.WHITE else "black"
         # 4) if it's engine's turn, skip waiting for user_input
