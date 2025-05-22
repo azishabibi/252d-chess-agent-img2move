@@ -33,7 +33,7 @@ class ChessPlayAgent:
         self.board = None
         self.history = []
 
-    def infer_fen_from_image(self, image_path: Path, conf_thresh: float = 0.9) -> str:
+    def infer_fen_from_image(self, image_path: Path, conf_thresh: float = 0.9, white_bottom: bool = True) -> str:
         res = self.model.predict(
             source=str(image_path),
             imgsz=img_size,
@@ -56,6 +56,8 @@ class ChessPlayAgent:
             labels[idx] = c
         
         rows = []
+        if not white_bottom:
+            labels = labels[::-1]
         for i in range(0,64,8):
             r = "".join(labels[i:i+8])
             rows.append(re.sub(r"0+", lambda m: str(len(m.group(0))), r))
@@ -214,7 +216,8 @@ class ChessPlayAgent:
         user_input: str,
         side_to_move: str,
         user_side: str,
-        output_png: str = "next.png"
+        white_bottom: bool = True,
+        output_png: str = "next.png",
     ) -> dict:
         """
         Multi‐round handler that:
@@ -234,7 +237,7 @@ class ChessPlayAgent:
         if user_input and Path(user_input).is_file():
             image_path = Path(user_input)
             img_bytes = image_path.read_bytes()
-            fen = self.infer_fen_from_image(image_path)
+            fen = self.infer_fen_from_image(image_path, white_bottom=white_bottom)
             self.board = chess.Board(fen)
             self.board.turn = chess.WHITE if side_to_move.lower() == "white" else chess.BLACK
             fen = self.board.fen()

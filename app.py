@@ -20,7 +20,7 @@ agent = ChessPlayAgent(
     openai_api_key=OPENAI_API_KEY
 )
 
-def gradio_play(image, move_text, side_to_move, user_side, restart_flag):
+def gradio_play(image, move_text, side_to_move, user_side, white_bottom, restart_flag):
     # 1) Restart
     if restart_flag:
         agent.reset()
@@ -34,7 +34,7 @@ def gradio_play(image, move_text, side_to_move, user_side, restart_flag):
             tmp_path = tmp.name
 
         # — first, initialize the board from the image
-        init_out = agent.handle_input(tmp_path, side_to_move, user_side, output_png="out.png")
+        init_out = agent.handle_input(tmp_path, side_to_move, user_side, white_bottom, output_png="out.png")
 
         # — if the user also typed a move, play it now
         if move_text:
@@ -42,6 +42,7 @@ def gradio_play(image, move_text, side_to_move, user_side, restart_flag):
                 user_input=move_text,
                 side_to_move=side_to_move,
                 user_side=user_side,
+                white_bottom=white_bottom,
                 output_png="out.png"
             )
             # build feedback
@@ -64,6 +65,7 @@ def gradio_play(image, move_text, side_to_move, user_side, restart_flag):
             user_input=move_text or "",
             side_to_move=side_to_move,
             user_side=user_side,
+            white_bottom=white_bottom,
             output_png="out.png"
         )
         if out["mode"] == "engine_move":
@@ -92,6 +94,7 @@ with gr.Blocks() as demo:
             move_in    = gr.Textbox(label="Move", placeholder="e4 or move knight from g1 to f3")
             side_to    = gr.Radio(["white","black"], value="white", label="Side to move")
             user_side  = gr.Radio(["white","black"], value="white", label="Your side")
+            white_bot  = gr.Checkbox(label="White side at bottom",value=True)  # ← NEW
             restart    = gr.Checkbox(label="Restart game")
             play_btn   = gr.Button("Submit")
 
@@ -101,7 +104,7 @@ with gr.Blocks() as demo:
 
     play_btn.click(
         fn=gradio_play,
-        inputs=[board_in, move_in, side_to, user_side, restart],
+        inputs=[board_in, move_in, side_to, user_side, white_bot, restart],
         outputs=[board_out, feedback, restart],
     )
 
