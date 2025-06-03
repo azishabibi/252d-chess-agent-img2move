@@ -7,20 +7,27 @@ import gradio as gr
 from gradio.routes import mount_gradio_app
 from dotenv import load_dotenv
 from PIL import Image
-from agent import ChessPlayAgent
+from agent import ChessPlayAgent,  VALID_LLM_MODELS
 
 load_dotenv()
 
 YOLO_WEIGHTS   = "yolov5-chess5/weights/best.pt"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
+DEFAULT_MODEL = "gpt-4o"
 app = FastAPI()
 agent = ChessPlayAgent(
     yolo_weights=YOLO_WEIGHTS,
-    openai_api_key=OPENAI_API_KEY
+    openai_api_key=OPENAI_API_KEY,
+    model_name=DEFAULT_MODEL,
 )
 
-def gradio_play(image, move_text, side_to_move, user_side, white_bottom, game_mode, restart_flag):
+def gradio_play(image, move_text, side_to_move, user_side, white_bottom, game_mode, model_choice,restart_flag):
+    
+    try:
+        agent.set_model(model_choice)
+    except ValueError as e:
+        return None, f"Unsupported model: {e}", gr.update(value=False)
+    
     # 1) Restart
     if restart_flag:
         agent.reset()
@@ -98,7 +105,12 @@ def gradio_play(image, move_text, side_to_move, user_side, white_bottom, game_mo
     except Exception as e:
         return None, f"Error: {e}", gr.update(value=False)
 
-def refresh_chess960(side_to_move, user_side, white_bottom):
+def refresh_chess960(side_to_move, user_side, white_bottom, model_choice):
+    try:
+        agent.set_model(model_choice)
+    except ValueError:
+        pass
+    
     agent.reset()
     init_out = agent.handle_input(
         user_input="",
@@ -117,6 +129,7 @@ def gradio_restart():
     return None, "Game restarted - upload a board or enter a move."
 
 PREVIEW_SIZE = 400
+MODEL_LIST   = sorted(VALID_LLM_MODELS)
 
 with gr.Blocks() as demo:
     gr.Markdown("## Chess Agent Playground")
@@ -133,19 +146,20 @@ with gr.Blocks() as demo:
             with gr.Row():
                 side_to    = gr.Radio(["white","black"], value="white", label="Side to move")
                 user_side  = gr.Radio(["white","black"], value="white", label="Your side")
-            with gr.Row():
                 game_mode = gr.Radio(["Standard","Chess960"], value="Standard", label="Game Mode")
+            with gr.Row():
+                model_dd = gr.Dropdown(MODEL_LIST, value=DEFAULT_MODEL, label="LLM Model")
                 with gr.Column():
                     white_bot  = gr.Checkbox(label="White side at bottom",value=True)
                     refresh_btn = gr.Button("Refresh Board(chess960)")           
-
+                    
         with gr.Column():
             board_out  = gr.Image(label="Updated Board",height=PREVIEW_SIZE)
             feedback   = gr.Textbox(label="Status", interactive=False)
 
     play_btn.click(
         fn=gradio_play,
-        inputs=[board_in, move_in, side_to, user_side, white_bot, game_mode],
+        inputs=[board_in, move_in, side_to, user_side, white_bot, game_mode, model_dd],
         outputs=[board_out, feedback],
     )
     restart_btn.click(

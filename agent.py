@@ -12,7 +12,15 @@ import random
 from openai import OpenAI, OpenAIError
 
 img_size = (448, 448)
-model_name = "gpt-4.1"
+
+VALID_LLM_MODELS = {
+    # GPT‑4o family
+    "gpt-4o", "gpt-4o-mini", "gpt-4o-turbo",
+    # GPT‑4.1 family
+    "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+    # o‑series (reasoning)
+    "o3", "o3-mini", "o4-mini", "o4-mini-high",
+}
 class ChessPlayAgent:
     # PIECE_REGEX = re.compile(
     #     r"\b(move\s+the\s+)?(?P<piece>pawn|knight|bishop|rook|queen|king)"
@@ -22,12 +30,24 @@ class ChessPlayAgent:
 
     # SAN_OR_UGCI_REGEX = re.compile(r"^[PNBRQK]?[a-h]?[1-8]?x?[a-h][1-8][+#]?$", re.IGNORECASE)
 
-    def __init__(self, yolo_weights: str, openai_api_key: str):
+    def __init__(self, yolo_weights: str, openai_api_key: str, model_name: str = "gpt-4.1"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = YOLO(yolo_weights, task="detect").to(self.device)
+        self.model_name = self._validate_model(model_name)
         os.environ["OPENAI_API_KEY"] = openai_api_key
         self.openai = OpenAI()
         self.reset()
+
+    @staticmethod
+    def _validate_model(name: str) -> str:
+        if name not in VALID_LLM_MODELS:
+            raise ValueError(
+                f"Unknown / unsupported model '{name}'. Choose from: {sorted(VALID_LLM_MODELS)}"
+            )
+        return name
+    def set_model(self, model_name: str):
+        """Change the backing LLM at runtime (e.g. "gpt‑4o", "gpt‑4o‑mini", "gpt‑4.1", "gpt‑4‑turbo", "o3")."""
+        self.model_name = model_name
 
     def reset(self):
         """Clear the game state."""
@@ -119,7 +139,7 @@ class ChessPlayAgent:
         for attempt in range(max_retries):
             try:
                 resp = self.openai.chat.completions.create(
-                    model=model_name,
+                    model=self.model_name,
                     messages=messages,
                     temperature=0.0
                 )
@@ -192,7 +212,7 @@ class ChessPlayAgent:
 
         for _ in range(max_retries):
             resp = self.openai.chat.completions.create(
-                model=model_name,
+                model=self.model_name,
                 messages=messages,
                 temperature=0.0
             )
