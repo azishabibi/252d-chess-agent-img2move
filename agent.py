@@ -23,10 +23,11 @@ VALID_LLM_MODELS = {
 }
 class ChessPlayAgent:
 
-    def __init__(self, yolo_weights: str, openai_api_key: str, model_name: str = "gpt-4.1"):
+    def __init__(self, yolo_weights: str, openai_api_key: str, model_name: str = "gpt-4.1",temperature: float = 0.0,):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = YOLO(yolo_weights, task="detect").to(self.device)
         self.model_name = self._validate_model(model_name)
+        self.temperature = max(0.0, min(2.0, temperature))
         os.environ["OPENAI_API_KEY"] = openai_api_key
         self.openai = OpenAI()
         self.reset()
@@ -149,7 +150,7 @@ class ChessPlayAgent:
                 resp = self.openai.chat.completions.create(
                     model=self.model_name,
                     messages=messages,
-                    temperature=0.0
+                    temperature=self.temperature,
                 )
                 choice = json.loads(resp.choices[0].message.content)
                 uci = choice.get("uci")
@@ -222,7 +223,7 @@ class ChessPlayAgent:
             resp = self.openai.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
-                temperature=0.0
+                temperature=self.temperature,
             )
             try:
                 choice = json.loads(resp.choices[0].message.content)

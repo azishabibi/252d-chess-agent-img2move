@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore")
+
 import os
 import tempfile
 from pathlib import Path
@@ -148,7 +151,11 @@ with gr.Blocks() as demo:
                 user_side  = gr.Radio(["white","black"], value="white", label="Your side")
                 game_mode = gr.Radio(["Standard","Chess960"], value="Standard", label="Game Mode")
             with gr.Row():
-                model_dd = gr.Dropdown(MODEL_LIST, value=DEFAULT_MODEL, label="LLM Model")
+                with gr.Column():
+                    model_dd = gr.Dropdown(MODEL_LIST, value=DEFAULT_MODEL, label="LLM Model")
+                    temp_slider = gr.Slider(
+                        minimum=0.0, maximum=2.0, step=0.01, value=0.0,
+                        label="Temperature")
                 with gr.Column():
                     white_bot  = gr.Checkbox(label="White side at bottom",value=True)
                     refresh_btn = gr.Button("Refresh Board(chess960)")           
@@ -159,7 +166,7 @@ with gr.Blocks() as demo:
 
     play_btn.click(
         fn=gradio_play,
-        inputs=[board_in, move_in, side_to, user_side, white_bot, game_mode, model_dd],
+        inputs=[board_in, move_in, side_to, user_side, white_bot, game_mode, model_dd, temp_slider],
         outputs=[board_out, feedback],
     )
     restart_btn.click(
