@@ -14,21 +14,14 @@ from openai import OpenAI, OpenAIError
 img_size = (448, 448)
 
 VALID_LLM_MODELS = {
-    # GPT‑4o family
+    # GPT-4o family
     "gpt-4o", "gpt-4o-mini", "gpt-4o-turbo",
-    # GPT‑4.1 family
+    # GPT-4.1 family
     "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
-    # o‑series (reasoning)
+    # o-series (reasoning)
     "o3", "o3-mini", "o4-mini", "o4-mini-high",
 }
 class ChessPlayAgent:
-    # PIECE_REGEX = re.compile(
-    #     r"\b(move\s+the\s+)?(?P<piece>pawn|knight|bishop|rook|queen|king)"
-    #     r"\s+(from\s+)?(?P<from>[a-h][1-8])\s+(to\s+)?(?P<to>[a-h][1-8])",
-    #     re.IGNORECASE
-    # )
-
-    # SAN_OR_UGCI_REGEX = re.compile(r"^[PNBRQK]?[a-h]?[1-8]?x?[a-h][1-8][+#]?$", re.IGNORECASE)
 
     def __init__(self, yolo_weights: str, openai_api_key: str, model_name: str = "gpt-4.1"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -46,7 +39,7 @@ class ChessPlayAgent:
             )
         return name
     def set_model(self, model_name: str):
-        """Change the backing LLM at runtime (e.g. "gpt‑4o", "gpt‑4o‑mini", "gpt‑4.1", "gpt‑4‑turbo", "o3")."""
+        """Change the backing LLM at runtime (e.g. "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4-turbo", "o3")."""
         self.model_name = model_name
 
     def reset(self):
@@ -112,17 +105,32 @@ class ChessPlayAgent:
         legal_desc  = self.describe_legal_moves()
         print(f"Legal moves: {legal_desc}")
         system = (
-             "You are a world-class chess engine and grandmaster.\n"
-             "When given a board state in FEN and a description of all piece locations and all possible moves in oth uci format and natual language format,\n"
-             "follow this process internally:\n"
-             "  1. Based on the description of all piece locations and FEN, evaluate the current position based on the side you are playing.\n"
-             "  2. Evaluate each candidate move(from all possible moves given by you) using core chess principles (step-by-step)\n"
-             "     (material balance, king safety, center control, piece activity, tactics, etc).\n"
-             "  3. Select the single strongest move.\n"
-             "Finally, output ONLY valid JSON with exactly two keys:\n"
-             "  {\"uci\": \"<best-move-in-uci>\", \"san\": \"<best-move-in-san>\"}\n"
-             "Do not include any other text or commentary."
-         )
+            # ─── Identity ───────────────────────────────────────────────────────────────
+            "You are a world-class chess engine and grand-master coach.\n"
+            "\n"
+            # ─── Input format ───────────────────────────────────────────────────────────
+            "You will receive:\n"
+            "  • A FEN string describing the current position.\n"
+            "  • A natural-language description of every piece on every square.\n"
+            "  • The complete list of legal moves, first in UCI format, then in English.\n"
+            "\n"
+            # ─── Internal reasoning protocol ────────────────────────────────────────────
+            "Think silently and follow this private checklist **without revealing it**:\n"
+            "  1. Evaluate the position for the side to move (material, king safety, "
+            "centre control, piece activity, tactics).\n"
+            "  2. Enumerate the most promising candidate moves (at least three).\n"
+            "  3. For each candidate, reason step-by-step about its consequences.\n"
+            "  4. Reflect on your analysis; if you detect a blunder, reconsider.\n"
+            "  5. Select the single strongest move **that appears in the legal-move list**.\n"
+            "  6. Double-check the chosen move is legal and does not leave your king "
+            "   in check.\n"
+            "\n"
+            # ─── Output contract ────────────────────────────────────────────────────────
+            "Respond ONLY with valid JSON **exactly matching** this schema, "
+            "using lower-case keys and no additional text:\n"
+            "  {\"uci\": \"<best_move_in_uci>\", \"san\": \"<best_move_in_san>\"}"
+        )
+
         messages = [
             {"role": "system", "content": system},
             {"role": "user",   "content": f"FEN: {fen}\nPiece locations: {desc}"},
@@ -169,7 +177,7 @@ class ChessPlayAgent:
 
     def parse_user_move_with_llm(self, user_input: str, max_retries: int = 3) -> str:
         """
-        Ask the LLM to convert free‑form input (English, SAN, UCI) into a valid UCI move.
+        Ask the LLM to convert free-form input (English, SAN, UCI) into a valid UCI move.
         Retries if the move is illegal.
         Returns the UCI string (e.g. "g1f3").
         """

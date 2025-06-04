@@ -8,3 +8,7 @@ play-chess-against-chat-gpt-on-chess-dot-com.jpg
 Minesweeper-Solver/
 *.png
 PythonFarmGame/
+farm_agent.py
+random_img_infer.py
+yolov5m.pt
+yolov5mu.pt
