@@ -16,7 +16,7 @@ load_dotenv()
 
 YOLO_WEIGHTS   = "yolov5-chess5/weights/best.pt"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-DEFAULT_MODEL = "gpt-4o"
+DEFAULT_MODEL = "gpt-4.1"
 app = FastAPI()
 agent = ChessPlayAgent(
     yolo_weights=YOLO_WEIGHTS,

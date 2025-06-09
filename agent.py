@@ -19,11 +19,11 @@ VALID_LLM_MODELS = {
     # GPT-4.1 family
     "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
     # o-series (reasoning)
-    "o3", "o3-mini", "o4-mini", "o4-mini-high",
+    "o3", "o3-mini", "o4-mini",
 }
 
 # o-series models don’t support a temperature parameter
-NO_TEMPERATURE_MODELS = {"o3", "o3-mini", "o4-mini", "o4-mini-high"}
+NO_TEMPERATURE_MODELS = {"o3", "o3-mini", "o4-mini"}
 
 # Schema for engine‐move selection (uci + san)
 MOVE_SELECTION_SCHEMA = {
