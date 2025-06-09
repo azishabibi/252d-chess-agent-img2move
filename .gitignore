@@ -12,3 +12,4 @@ farm_agent.py
 random_img_infer.py
 yolov5m.pt
 yolov5mu.pt
+elo.py

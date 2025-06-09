@@ -24,17 +24,17 @@ agent = ChessPlayAgent(
     model_name=DEFAULT_MODEL,
 )
 
-def gradio_play(image, move_text, side_to_move, user_side, white_bottom, game_mode, model_choice,restart_flag):
+def gradio_play(image, move_text, side_to_move, user_side, white_bottom, game_mode, model_choice, temperature):
     
     try:
         agent.set_model(model_choice)
     except ValueError as e:
         return None, f"Unsupported model: {e}", gr.update(value=False)
-    
-    # 1) Restart
-    if restart_flag:
-        agent.reset()
-        return None, "Game restarted - upload a board or enter a move.", gr.update(value=False)
+    agent.temperature = max(0.0, min(2.0, temperature))
+    # # 1) Restart
+    # if restart_flag:
+    #     agent.reset()
+    #     return None, "Game restarted - upload a board or enter a move.", gr.update(value=False)
 
     # chess 960 initialization
     chess960 = (game_mode.lower() == "chess960")

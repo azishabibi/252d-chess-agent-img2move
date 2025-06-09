@@ -21,6 +21,32 @@ VALID_LLM_MODELS = {
     # o-series (reasoning)
     "o3", "o3-mini", "o4-mini", "o4-mini-high",
 }
+
+# o-series models don’t support a temperature parameter
+NO_TEMPERATURE_MODELS = {"o3", "o3-mini", "o4-mini", "o4-mini-high"}
+
+# Schema for engine‐move selection (uci + san)
+MOVE_SELECTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "uci": {"type": "string", "description": "best move in UCI"},
+        "san": {"type": "string", "description": "best move in SAN"}
+    },
+    "required": ["uci", "san"],
+    "additionalProperties": False
+}
+
+# Schema for parsing user input (just uci)
+MOVE_PARSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "uci": {"type": "string", "description": "legal move in UCI"}
+    },
+    "required": ["uci"],
+    "additionalProperties": False
+}
+
+
 class ChessPlayAgent:
 
     def __init__(self, yolo_weights: str, openai_api_key: str, model_name: str = "gpt-4.1",temperature: float = 0.0,):
@@ -145,12 +171,26 @@ class ChessPlayAgent:
                 "name": "board_image",
                 "content": image_bytes
             })
+        call_kwargs = {"model": self.model_name, "messages": messages}
+        
+        call_kwargs["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name":        "move_selection",                    # required
+                "description": "Best chess move in UCI and SAN",    # optional but helpful
+                "strict":      True,                                # enforce exact match
+                "schema":      MOVE_SELECTION_SCHEMA               # <— here
+            }
+        }
+        if self.model_name not in NO_TEMPERATURE_MODELS:
+            call_kwargs["temperature"] = self.temperature
         for attempt in range(max_retries):
             try:
                 resp = self.openai.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    temperature=self.temperature,
+                    **call_kwargs,
+                    # model=self.model_name,
+                    # messages=messages,
+                    # temperature=self.temperature,
                 )
                 choice = json.loads(resp.choices[0].message.content)
                 uci = choice.get("uci")
@@ -162,10 +202,11 @@ class ChessPlayAgent:
                     "role":"system",
                     "content": "That move was illegal; please provide a valid move."
                 })
-            except (OpenAIError, json.JSONDecodeError, ValueError):
+            except Exception as e:
+                print(f"Error on attempt {attempt + 1}/{max_retries}: {e}")
                 messages.append({
                     "role":"system",
-                    "content": "I didn’t understand; please reply with a valid move JSON."
+                    "content": e,
                 })
         raise RuntimeError("Failed to get a legal move from the model after retries")
 
@@ -218,12 +259,24 @@ class ChessPlayAgent:
         except ValueError:
             pass
          # 3) Fallback to LLM-based parsing
-
+        call_kwargs = {"model": self.model_name, "messages": messages}
+        call_kwargs["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name":        "move_parse",
+                "description": "Parsed legal UCI move",
+                "strict":      True,
+                "schema":      MOVE_PARSE_SCHEMA
+            }
+        }
+        if self.model_name not in NO_TEMPERATURE_MODELS:
+            call_kwargs["temperature"] = self.temperature
         for _ in range(max_retries):
             resp = self.openai.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                temperature=self.temperature,
+                **call_kwargs,
+                # model=self.model_name,
+                # messages=messages,
+                # temperature=self.temperature,
             )
             try:
                 choice = json.loads(resp.choices[0].message.content)
@@ -395,7 +448,7 @@ class ChessPlayAgent:
             self.render_board_image(output_png, orientation=orientation)
             return {
                 "mode":        "engine_failed",
-                "description": "Failed to get a legal engine move after user move",
+                "description": "Failed to get a legal engine move after user move due to runtime error",
                 "png":         output_png
             }
 
