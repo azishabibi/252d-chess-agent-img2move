@@ -451,6 +451,46 @@ class ChessPlayAgent:
                 "description": "Failed to get a legal engine move after user move due to runtime error",
                 "png":         output_png
             }
+        
+    def suggest_moves(self, num_suggestions: int = 3) -> str:
+        """
+        Suggest potential moves for the current player and explain the reasoning behind each.
+        Returns a plain text recommendation with UCI and SAN notation and explanations.
+        """
+        if self.board is None:
+            return "Board not initialized. Please start a game or load an image first."
 
+        # Gather current position
+        fen = self.board.fen()
+        desc = self.describe_board()
+        legal_moves = [m.uci() for m in self.board.legal_moves]
+        legal_str = ", ".join(legal_moves)
+
+        # Build coaching prompt
+        system = (
+            "You are a world-class chess coach.\n"
+            "You will be given the current position in FEN format, a description of piece locations, and the list of legal moves.\n"
+            f"Provide {num_suggestions} candidate moves. For each, include the UCI and SAN notation, and explain why it's strong or what plans it supports.\n"
+        )
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user",   "content": f"FEN: {fen}\nPiece locations: {desc}"},
+            {"role": "user",   "content": f"Legal moves (UCI): {legal_str}"}
+        ]
+        call_args = {
+            "model": self.model_name,
+            "messages": messages,
+            "temperature": 0.7
+        }
+        # Remove temperature for models that don't allow it
+        if self.model_name in NO_TEMPERATURE_MODELS:
+            call_args.pop("temperature", None)
+
+        # Query LLM for advice
+        try:
+            resp = self.openai.chat.completions.create(**call_args)
+            return resp.choices[0].message.content
+        except OpenAIError as e:
+            return f"LLM error when generating advice: {e}"
 
 

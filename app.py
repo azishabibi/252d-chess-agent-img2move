@@ -131,6 +131,11 @@ def gradio_restart():
     agent.reset()
     return None, "Game restarted - upload a board or enter a move."
 
+# Wrapper for Gradio to fetch advice
+def get_advice():
+    # Returns a string with move suggestions and explanations
+    return agent.suggest_moves()
+
 PREVIEW_SIZE = 400
 MODEL_LIST   = sorted(VALID_LLM_MODELS)
 
@@ -163,6 +168,8 @@ with gr.Blocks() as demo:
         with gr.Column():
             board_out  = gr.Image(label="Updated Board",height=PREVIEW_SIZE)
             feedback   = gr.Textbox(label="Status", interactive=False)
+            suggest_btn = gr.Button("Suggest Moves")
+            advice_box  = gr.Textbox(label="Move Advice & Explanations", interactive=False, lines=10)
 
     play_btn.click(
         fn=gradio_play,
@@ -180,7 +187,12 @@ with gr.Blocks() as demo:
         inputs=[side_to, user_side, white_bot],
         outputs=[board_out, feedback]
     )
-
+    
+    suggest_btn.click(
+        fn=get_advice,
+        inputs=[],
+        outputs=advice_box
+    )
 
 # Mount Gradio onto FastAPI
 app = mount_gradio_app(app, demo, path="/")
